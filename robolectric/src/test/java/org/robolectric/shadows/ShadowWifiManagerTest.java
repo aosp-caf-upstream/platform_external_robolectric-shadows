@@ -16,11 +16,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 import org.robolectric.annotation.Config;
 
-@RunWith(TestRunners.MultiApiSelfTest.class)
+@RunWith(RobolectricTestRunner.class)
 public class ShadowWifiManagerTest {
   private final WifiManager wifiManager = (WifiManager) RuntimeEnvironment.application.getSystemService(Context.WIFI_SERVICE);
   private final ShadowWifiManager shadowWifiManager = shadowOf(wifiManager);
@@ -28,6 +28,13 @@ public class ShadowWifiManagerTest {
   @Test
   public void shouldReturnWifiInfo() {
     assertThat(wifiManager.getConnectionInfo().getClass()).isEqualTo(WifiInfo.class);
+  }
+
+  @Test
+  public void setWifiInfo_shouldUpdateWifiInfo() {
+    WifiInfo wifiInfo = new WifiInfo();
+    shadowWifiManager.setConnectionInfo(wifiInfo);
+    assertThat(wifiManager.getConnectionInfo()).isSameAs(wifiInfo);
   }
 
   @Test(expected = SecurityException.class)

@@ -3,12 +3,14 @@ package org.robolectric.shadows;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.GET_META_DATA;
 import static android.content.pm.PackageManager.GET_SIGNATURES;
+import static android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS;
 import static android.content.pm.PackageManager.MATCH_UNINSTALLED_PACKAGES;
 import static android.content.pm.PackageManager.SIGNATURE_UNKNOWN_PACKAGE;
 import static android.os.Build.VERSION_CODES.JELLY_BEAN;
 import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
 import static android.os.Build.VERSION_CODES.M;
 import static android.os.Build.VERSION_CODES.N;
+import static android.os.Build.VERSION_CODES.O_MR1;
 
 import android.annotation.DrawableRes;
 import android.annotation.NonNull;
@@ -25,7 +27,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.FeatureInfo;
 import android.content.pm.IPackageDataObserver;
 import android.content.pm.IPackageDeleteObserver;
-import android.content.pm.IPackageInstallObserver;
 import android.content.pm.IPackageStatsObserver;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.IntentFilterVerificationInfo;
@@ -51,6 +52,18 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.storage.VolumeInfo;
 import android.util.Pair;
+
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
+import org.robolectric.manifest.ActivityData;
+import org.robolectric.manifest.AndroidManifest;
+import org.robolectric.manifest.ContentProviderData;
+import org.robolectric.manifest.PackageItemData;
+import org.robolectric.manifest.PermissionItemData;
+import org.robolectric.manifest.ServiceData;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -60,15 +73,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.annotation.Implementation;
-import org.robolectric.annotation.Implements;
-import org.robolectric.manifest.ActivityData;
-import org.robolectric.manifest.AndroidManifest;
-import org.robolectric.manifest.ContentProviderData;
-import org.robolectric.manifest.PackageItemData;
-import org.robolectric.manifest.PermissionItemData;
-import org.robolectric.manifest.ServiceData;
 
 @Implements(value = ApplicationPackageManager.class, isInAndroidSdk = false, looseSignatures = true)
 public class ShadowApplicationPackageManager extends ShadowPackageManager {
@@ -79,9 +83,10 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
     for (PackageInfo packageInfo : packageInfos.values()) {
       if (applicationEnabledSettingMap.get(packageInfo.packageName)
           != COMPONENT_ENABLED_STATE_DISABLED
-          || (flags & MATCH_UNINSTALLED_PACKAGES) == MATCH_UNINSTALLED_PACKAGES) {
-            result.add(packageInfo);
-          }
+          || (flags & MATCH_UNINSTALLED_PACKAGES) == MATCH_UNINSTALLED_PACKAGES
+          || (flags & MATCH_DISABLED_COMPONENTS) == MATCH_DISABLED_COMPONENTS) {
+        result.add(packageInfo);
+      }
     }
 
     return result;
@@ -216,6 +221,9 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
 
   @Implementation
   public ProviderInfo resolveContentProvider(String name, int flags) {
+    if (name == null) {
+      return null;
+    }
     for (PackageInfo packageInfo : packageInfos.values()) {
       if (packageInfo.providers == null) continue;
 
@@ -239,7 +247,8 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
     PackageInfo info = packageInfos.get(packageName);
     if (info != null) {
       if (applicationEnabledSettingMap.get(packageName) == COMPONENT_ENABLED_STATE_DISABLED
-          && (flags & MATCH_UNINSTALLED_PACKAGES) != MATCH_UNINSTALLED_PACKAGES) {
+          && (flags & MATCH_UNINSTALLED_PACKAGES) != MATCH_UNINSTALLED_PACKAGES
+          && (flags & MATCH_DISABLED_COMPONENTS) != MATCH_DISABLED_COMPONENTS) {
         throw new NameNotFoundException("Package is disabled, can't find");
       }
       return info;
@@ -269,6 +278,14 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
     }
 
     return resolveInfos;
+  }
+
+  /**
+   * Behaves as {@link #queryIntentServices(Intent, int)} and currently ignores userId.
+   */
+  @Implementation(minSdk = JELLY_BEAN_MR1)
+  public List<ResolveInfo> queryIntentServicesAsUser(Intent intent, int flags, int userId) {
+    return queryIntentServices(intent, flags);
   }
 
   @Implementation
@@ -464,6 +481,7 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation
+  @Override
   public void freeStorageAndNotify(long freeStorageSize, IPackageDataObserver observer) {
   }
 
@@ -492,46 +510,37 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation(maxSdk = JELLY_BEAN)
-  public void getPackageSizeInfo(String packageName, final IPackageStatsObserver observer) {
-    final PackageStats packageStats = packageStatsMap.get(packageName);
-    new Handler(Looper.getMainLooper()).post(new Runnable() {
-
-      public void run() {
-        try {
-          observer.onGetStatsCompleted(packageStats, packageStats != null);
-        } catch (RemoteException remoteException) {
-          remoteException.rethrowFromSystemServer();
-        }
+  public void getPackageSizeInfo(Object pkgName, Object observer) {
+    final PackageStats packageStats = packageStatsMap.get((String) pkgName);
+    new Handler(Looper.getMainLooper()).post(() -> {
+      try {
+        ((IPackageStatsObserver) observer).onGetStatsCompleted(packageStats, packageStats != null);
+      } catch (RemoteException remoteException) {
+        remoteException.rethrowFromSystemServer();
       }
     });
   }
 
   @Implementation(minSdk = JELLY_BEAN_MR1, maxSdk = M)
-  public void getPackageSizeInfo(String pkgName, int uid, final IPackageStatsObserver callback) {
-    final PackageStats packageStats = packageStatsMap.get(pkgName);
-    new Handler(Looper.getMainLooper()).post(new Runnable() {
-
-      public void run() {
-        try {
-          callback.onGetStatsCompleted(packageStats, packageStats != null);
-        } catch (RemoteException remoteException) {
-          remoteException.rethrowFromSystemServer();
-        }
+  public void getPackageSizeInfo(Object pkgName, Object uid, final Object observer) {
+    final PackageStats packageStats = packageStatsMap.get((String) pkgName);
+    new Handler(Looper.getMainLooper()).post(() -> {
+      try {
+        ((IPackageStatsObserver) observer).onGetStatsCompleted(packageStats, packageStats != null);
+      } catch (RemoteException remoteException) {
+        remoteException.rethrowFromSystemServer();
       }
     });
   }
 
   @Implementation(minSdk = N)
-  public void getPackageSizeInfoAsUser(String pkgName, int uid, final IPackageStatsObserver callback) {
-    final PackageStats packageStats = packageStatsMap.get(pkgName);
-    new Handler(Looper.getMainLooper()).post(new Runnable() {
-
-      public void run() {
-        try {
-          callback.onGetStatsCompleted(packageStats, packageStats != null);
-        } catch (RemoteException remoteException) {
-          remoteException.rethrowFromSystemServer();
-        }
+  public void getPackageSizeInfoAsUser(Object pkgName, Object uid, final Object observer) {
+    final PackageStats packageStats = packageStatsMap.get((String) pkgName);
+    new Handler(Looper.getMainLooper()).post(() -> {
+      try {
+        ((IPackageStatsObserver) observer).onGetStatsCompleted(packageStats, packageStats != null);
+      } catch (RemoteException remoteException) {
+        remoteException.rethrowFromSystemServer();
       }
     });
   }
@@ -560,6 +569,7 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation
+  @Override
   public Drawable getApplicationIcon(String packageName) throws NameNotFoundException {
     return applicationIcons.get(packageName);
   }
@@ -608,11 +618,13 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
     return result;
   }
 
+  @Override
   public CharSequence getApplicationLabel(ApplicationInfo info) {
     return info.name;
   }
 
   @Implementation
+  @Override
   public Intent getLaunchIntentForPackage(String packageName) {
     Intent intentToResolve = new Intent(Intent.ACTION_MAIN);
     intentToResolve.addCategory(Intent.CATEGORY_INFO);
@@ -694,6 +706,7 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation
+  @Override
   public ApplicationInfo getApplicationInfo(String packageName, int flags) throws NameNotFoundException {
     PackageInfo info = packageInfos.get(packageName);
     if (info != null) {
@@ -704,7 +717,8 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
       }
 
       if (applicationEnabledSettingMap.get(packageName) == COMPONENT_ENABLED_STATE_DISABLED
-          && (flags & MATCH_UNINSTALLED_PACKAGES) != MATCH_UNINSTALLED_PACKAGES) {
+          && (flags & MATCH_UNINSTALLED_PACKAGES) != MATCH_UNINSTALLED_PACKAGES
+          && (flags & MATCH_DISABLED_COMPONENTS) != MATCH_DISABLED_COMPONENTS) {
         throw new NameNotFoundException("Package is disabled, can't find");
       }
       return info.applicationInfo;
@@ -712,7 +726,7 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
       throw new NameNotFoundException(packageName);
     }
   }
-  
+
   @Implementation
   public String[] getSystemSharedLibraryNames() {
     return new String[0];
@@ -810,11 +824,6 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation
-  public List<ResolveInfo> queryIntentServicesAsUser(Intent intent, int flags, int userId) {
-    return null;
-  }
-
-  @Implementation
   public List<ProviderInfo> queryContentProviders(String processName, int uid, int flags) {
     return null;
   }
@@ -832,7 +841,7 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   @Override @Nullable
   @Implementation
   public Drawable getDrawable(String packageName, @DrawableRes int resId, @Nullable ApplicationInfo appInfo) {
-    return drawables.get(new Pair(packageName, resId));
+    return drawables.get(new Pair<>(packageName, resId));
   }
 
   @Override @Implementation
@@ -948,7 +957,8 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation
-  public void installPackage(Uri packageURI, IPackageInstallObserver observer, int flags, String installerPackageName) {
+  @Config(maxSdk = O_MR1)
+  public void installPackage(Uri packageURI, Object observer, int flags, String installerPackageName) {
   }
 
   @Implementation

@@ -16,15 +16,16 @@ LOCAL_JAVA_LIBRARIES := \
   Robolectric_junit \
   Robolectric_utils \
   robolectric-host-android_all \
+  robolectric-host-monitor-1.0.2-alpha1 \
   robolectric-maven-ant-tasks-2.1.3 \
   robolectric-bouncycastle-1.46 \
-  robolectric-asm-commons-5.0.1 \
-  robolectric-asm-tree-5.0.1 \
+  robolectric-asm-commons-6.0 \
   robolectric-xstream-1.4.8 \
+  robolectric-asm-tree-6.0 \
   robolectric-junit-4.12 \
   robolectric-guava-20.0 \
-  robolectric-asm-5.0.1 \
   robolectric-ant-1.8.0 \
+  robolectric-asm-6.0 \
   jsr305lib
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src/main/java)
@@ -48,12 +49,10 @@ include $(CLEAR_VARS)
 # robolectric-host-android_all:prebuilts/misc/common/robolectric/android-all/android-all-o-preview-4-robolectric-0.jar
 
 LOCAL_PREBUILT_JAVA_LIBRARIES := \
-  robolectric-host-android_all:$(call java-lib-files, robolectric_android-all) \
+  robolectric-host-android_all:$(TARGET_OUT_COMMON_INTERMEDIATES)/JAVA_LIBRARIES/robolectric_android-all-stub_intermediates/classes-with-res.jar \
   robolectric-host-android-support-v4:$(call java-lib-files, android-support-v4) \
   robolectric-host-android-support-multidex:$(call java-lib-files, android-support-multidex) \
   robolectric-host-org_apache_http_legacy:$(call java-lib-files, org.apache.http.legacy) \
-  robolectric-host-play-services-v9-base:$(call java-lib-files, prebuilt-google-play-services-v9-base-1p) \
-  robolectric-host-play-services-v9-basement:$(call java-lib-files, prebuilt-google-play-services-v9-basement-1p) \
-  robolectric-host-play-services-v9-auth-base:$(call java-lib-files, prebuilt-google-play-services-v9-auth-base-1p)
+  robolectric-host-monitor-1.0.2-alpha1:$(call java-lib-files, robolectric-monitor-1.0.2-alpha1)
 
 include $(BUILD_HOST_PREBUILT)
