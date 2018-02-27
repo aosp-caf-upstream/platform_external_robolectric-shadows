@@ -77,6 +77,7 @@ LOCAL_PREBUILT_JAVA_LIBRARIES := \
   robolectric-httpclient-4.0.3:../../../prebuilts/tools/common/m2/repository/org/apache/httpcomponents/httpclient/4.0.3/httpclient-4.0.3.jar \
   robolectric-httpcore-4.0.1:../../../prebuilts/tools/common/m2/repository/org/apache/httpcomponents/httpcore/4.0.1/httpcore-4.0.1.jar \
   robolectric-icu4j-53.1:../../../prebuilts/tools/common/m2/repository/com/ibm/icu/icu4j/53.1/icu4j-53.1.jar \
+  robolectric-javax.annotation-api-1.2:../../../prebuilts/tools/common/m2/repository/javax/annotation/javax.annotation-api/1.2/javax.annotation-api-1.2.jar \
   robolectric-junit-4.12:../../../prebuilts/tools/common/m2/repository/junit/junit/4.12/junit-4.12.jar \
   robolectric-objenesis-2.5:../../../prebuilts/tools/common/m2/repository/org/objenesis/objenesis/2.5/objenesis-2.5.jar \
   robolectric-maven-ant-tasks-2.1.3:../../../prebuilts/tools/common/m2/repository/org/apache/maven/maven-ant-tasks/2.1.3/maven-ant-tasks-2.1.3.jar \
