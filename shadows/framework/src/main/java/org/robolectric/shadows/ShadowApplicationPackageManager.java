@@ -11,6 +11,7 @@ import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
 import static android.os.Build.VERSION_CODES.M;
 import static android.os.Build.VERSION_CODES.N;
 import static android.os.Build.VERSION_CODES.O_MR1;
+import static android.os.Build.VERSION_CODES.P;
 
 import android.annotation.DrawableRes;
 import android.annotation.NonNull;
@@ -320,6 +321,14 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
     }
 
     return resolveInfoList;
+  }
+
+  /**
+   * Behaves as {@link #queryIntentActivities(Intent, int)} and currently ignores userId.
+   */
+  @Implementation(minSdk = JELLY_BEAN_MR1)
+  protected List<ResolveInfo> queryIntentActivitiesAsUser(Intent intent, int flags, int userId) {
+    return queryIntentActivities(intent, flags);
   }
 
   /**
@@ -914,11 +923,6 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   }
 
   @Implementation
-  public List<ResolveInfo> queryIntentActivitiesAsUser(Intent intent, int flags, int userId) {
-    return null;
-  }
-
-  @Implementation
   public List<ResolveInfo> queryIntentActivityOptions(ComponentName caller, Intent[] specifics, Intent intent, int flags) {
     return null;
   }
@@ -1315,4 +1319,11 @@ public class ShadowApplicationPackageManager extends ShadowPackageManager {
   public Drawable loadUnbadgedItemIcon(PackageItemInfo itemInfo, ApplicationInfo appInfo) {
     return null;
   }
+
+  // BEGIN-INTERNAL
+  @Implementation(minSdk = P)
+  public String getSystemTextClassifierPackageName() {
+    return "";
+  }
+  // END-INTERNAL
 }
